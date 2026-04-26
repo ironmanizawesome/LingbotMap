@@ -93,7 +93,7 @@ class GCTStream(GCTBase):
         disable_global_rope: bool = False,
         # Head configuration
         enable_camera: bool = True,
-        enable_point: bool = True,
+        enable_point: bool = False,
         enable_local_point: bool = False,
         enable_depth: bool = True,
         enable_track: bool = False,
@@ -406,10 +406,15 @@ class GCTStream(GCTBase):
         # Clean KV caches before starting new sequence
         self.clean_kv_cache()
 
+        # Images may live on CPU for very-long-sequence memory efficiency.
+        # We slice-then-move per iteration so peak GPU memory is O(scale) or
+        # O(1) frames rather than O(S).
+        _model_device = next(self.parameters()).device
+
         # Phase 1: Process scale frames together
         # These frames get bidirectional attention among themselves via scale token
         logger.info(f'Processing {scale_frames} scale frames...')
-        scale_images = images[:, :scale_frames]
+        scale_images = images[:, :scale_frames].to(_model_device, non_blocking=True)
         # No-op unless hot modules were compiled with mode="reduce-overhead";
         # required then to reset CUDA-graph step state between replays.
         torch.compiler.cudagraph_mark_step_begin()
@@ -439,7 +444,7 @@ class GCTStream(GCTBase):
         if dbg_every:
             _log_kv_stats(self, label="after phase-1 scale")
         for i in pbar:
-            frame_image = images[:, i:i+1]
+            frame_image = images[:, i:i+1].to(_model_device, non_blocking=True)
 
             # Determine if this frame is a keyframe
             is_keyframe = (keyframe_interval <= 1) or ((i - scale_frames) % keyframe_interval == 0)

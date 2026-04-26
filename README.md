@@ -88,7 +88,7 @@ pip install -e ".[vis]"
 | :--- | :--- | :--- | :--- |
 | lingbot-map-long | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Better suited for long sequences and large scale scenes (Recommend). |
 | lingbot-map | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Balanced checkpoint — trade off all-around performance across short and long sequences. |
-| lingbot-map-stage1 | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Stage-1 training checkpoint of lingbot-map — can be loaded into the VGGT model for bidirectional inference. |
+| lingbot-map-stage1 | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Stage-1 training checkpoint of lingbot-map — can be loaded into the VGGT model for bidirectional inference (c2w). |
 
 > 🚧 **Coming soon:** we're training an stronger model that supports longer sequences — stay tuned.
 
@@ -100,9 +100,9 @@ Run `demo.py` for interactive 3D visualization via a browser-based [viser](https
 
 We provide four example scenes in `example/` that you can run out of the box:
 ```bash
-# Church scene
+# courthouse scene
 python demo.py --model_path /path/to/lingbot-map-long.pt \
-    --image_folder example/church --mask_sky
+    --image_folder example/courthouse --mask_sky
 ```
 
 
