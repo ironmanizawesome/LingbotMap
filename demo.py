@@ -353,6 +353,9 @@ def main():
                         help="Save sky mask visualizations (original | mask | overlay) to this directory")
     parser.add_argument("--export_preprocessed", type=str, default=None,
                         help="Export stride-sampled, resized/cropped images to this folder")
+    parser.add_argument("--save_predictions", type=str, default=None,
+                        help="Save vis-ready predictions to this .npz path and skip the viewer "
+                             "(use view_npz.py locally to visualize).")
 
     args = parser.parse_args()
     assert args.image_folder or args.video_path, \
@@ -496,6 +499,13 @@ def main():
         images_for_post = images
 
     predictions, images_cpu = postprocess(predictions, images_for_post)
+
+    # ── Save (skip viewer) ───────────────────────────────────────────────────
+    if args.save_predictions:
+        vis = prepare_for_visualization(predictions, images_cpu)
+        np.savez_compressed(args.save_predictions, **vis)
+        print(f"Saved predictions to {args.save_predictions}")
+        return
 
     # ── Visualize ────────────────────────────────────────────────────────────
     try:
