@@ -96,6 +96,12 @@ pip install -e ".[vis]"
 
 Run `demo.py` for interactive 3D visualization via a browser-based [viser](https://github.com/nerfstudio-project/viser) viewer (default `http://localhost:8080`).
 
+### Run on Colab
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ironmanizawesome/lingbot-map/blob/main/colab_drift_test.ipynb)
+
+[`colab_drift_test.ipynb`](colab_drift_test.ipynb) — `travel` sequence inference on a T4 with camera-trajectory drift analysis baked in.
+
 ### Try the Example Scenes
 
 We provide four example scenes in `example/` that you can run out of the box:
