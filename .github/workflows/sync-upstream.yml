@@ -1,0 +1,70 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream and fetch
+        run: |
+          git remote add upstream https://github.com/Robbyant/lingbot-map.git
+          git fetch upstream main
+
+      - name: Check if behind
+        id: behind
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "count=$BEHIND" >> "$GITHUB_OUTPUT"
+          echo "Behind upstream by $BEHIND commits."
+
+      - name: Try fast-forward / clean merge
+        if: steps.behind.outputs.count != '0'
+        id: merge
+        run: |
+          set +e
+          git merge --no-edit upstream/main
+          STATUS=$?
+          set -e
+          if [ $STATUS -eq 0 ]; then
+            echo "result=merged" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort || true
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push merged main
+        if: steps.merge.outputs.result == 'merged'
+        run: git push origin main
+
+      - name: Open PR on conflict
+        if: steps.merge.outputs.result == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="sync-upstream/$(date -u +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH" upstream/main
+          git push origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Sync upstream (manual conflict resolution needed)" \
+            --body "Automated sync from \`Robbyant/lingbot-map@main\` could not be merged cleanly into \`main\`. Resolve conflicts here and merge."
