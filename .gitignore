@@ -24,3 +24,9 @@ example/*_sky_masks/
 screenshot_*.png
 results/*.png
 sync_command.txt
+.claude-remote
+weights/
+.DS_Store
+**/.DS_Store
+docs/
+
