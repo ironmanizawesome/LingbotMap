@@ -13,3 +13,14 @@ CLAUDE.md
 skyseg.onnx
 models/
 .vscode/
+predictions/
+
+# Large model / data / outputs (keep out of git)
+checkpoints/
+example/videos/
+example/*_sky_masks/
+*.glb
+*.npz
+screenshot_*.png
+results/*.png
+sync_command.txt
