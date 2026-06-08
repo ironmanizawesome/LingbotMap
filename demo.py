@@ -353,9 +353,11 @@ def main():
                         help="Save sky mask visualizations (original | mask | overlay) to this directory")
     parser.add_argument("--export_preprocessed", type=str, default=None,
                         help="Export stride-sampled, resized/cropped images to this folder")
-    parser.add_argument("--save_predictions", type=str, default=None,
-                        help="Save vis-ready predictions to this .npz path and skip the viewer "
-                             "(use view_npz.py locally to visualize).")
+    parser.add_argument("--save_predictions", type=str, nargs="?", const="__AUTO__", default=None,
+                        help="Save vis-ready predictions as .npz and skip the viewer "
+                             "(use view_npz.py locally to visualize). Bare `--save_predictions` "
+                             "auto-names from the scene into predictions/; a bare filename also goes "
+                             "under predictions/; pass a path with a directory to override.")
 
     args = parser.parse_args()
     assert args.image_folder or args.video_path, \
@@ -501,10 +503,21 @@ def main():
     predictions, images_cpu = postprocess(predictions, images_for_post)
 
     # ── Save (skip viewer) ───────────────────────────────────────────────────
-    if args.save_predictions:
+    if args.save_predictions is not None:
+        out_path = args.save_predictions
+        if out_path == "__AUTO__":
+            # Auto-name from the input scene (image folder name or video stem).
+            src = args.image_folder or args.video_path or "predictions"
+            out_path = os.path.splitext(os.path.basename(os.path.normpath(src)))[0] + ".npz"
+        if not out_path.lower().endswith(".npz"):
+            out_path += ".npz"
+        # Bare filename (no directory) -> save under predictions/.
+        if not os.path.dirname(out_path):
+            out_path = os.path.join("predictions", out_path)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
         vis = prepare_for_visualization(predictions, images_cpu)
-        np.savez_compressed(args.save_predictions, **vis)
-        print(f"Saved predictions to {args.save_predictions}")
+        np.savez_compressed(out_path, **vis)
+        print(f"Saved predictions to {out_path}")
         return
 
     # ── Visualize ────────────────────────────────────────────────────────────
