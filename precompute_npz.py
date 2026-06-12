@@ -1,4 +1,9 @@
-"""Compare streaming 3D reconstruction across input resolutions (does NOT touch demo.py).
+"""Precompute streaming 3D reconstruction to .npz — the inference step that feeds LAI.
+
+This is the decoupled "run inference once, save npz" stage: downstream LAI measurement
+consumes the saved npz (world_points / world_points_conf / images) instead of re-running
+the model. Still supports several input resolutions in one call, but the primary use is a
+single chosen resolution. (Does NOT touch demo.py.)
 
 Why this exists
 ---------------
@@ -19,12 +24,17 @@ changing the *preprocessing* size. One model instance serves all resolutions.
 
 Usage
 -----
-    python compare_resolution.py \
+    python precompute_npz.py \
         --model_path checkpoints/lingbot-map-long.pt \
-        --image_folder example/courthouse \
-        --first_k 32 \
-        --image_sizes 518,644,728 \
-        --use_sdpa
+        --video_path example/videos/Watermelon_fullbed_sideview.MOV \
+        --fps 10 --first_k 0 \
+        --image_sizes 644 \
+        --max_frame_num 1200 \
+        --use_sdpa --mask_sky \
+        --out_dir predictions/restest
+
+Add --mask_sky to bake sky removal into each saved npz (zeros depth_conf over sky regions via
+the skyseg ONNX model) — recommended for LAI, where sky depth is garbage.
 
 Outputs, per resolution: peak GPU memory, inference time, and an .npz of predictions in
 --out_dir (view locally with view_npz.py to compare point-cloud quality).
@@ -43,6 +53,7 @@ import torch
 
 from lingbot_map.models.gct_stream import GCTStream
 from lingbot_map.utils.load_fn import load_and_preprocess_images
+from lingbot_map.vis.sky_segmentation import apply_sky_segmentation
 
 # Reuse demo.py's image/video loading and post-processing verbatim so the comparison
 # matches the real pipeline exactly. Importing demo only sets an env var + imports.
@@ -69,17 +80,24 @@ def append_log(log_path, row):
         f.write("| " + " | ".join(str(row.get(c, "")) for c in LOG_COLUMNS) + " |\n")
 
 
-def build_model(model_path, native_size, patch_size, num_scale_frames, use_sdpa, device):
+def build_model(model_path, native_size, patch_size, num_scale_frames, use_sdpa, device,
+                max_frame_num=1024):
     """Build GCTStream at the checkpoint-native size and load weights.
 
     Kwargs mirror demo.load_model so the only difference vs. demo is `img_size`, which we
     pin to `native_size` (not the per-run input resolution).
+
+    `max_frame_num` sizes the 3D-RoPE frequency table. With keyframe_interval=1 the RoPE
+    frame counter advances once per frame, so this must exceed the clip's frame count or the
+    time-axis lookup runs off the table mid-stream and RoPE collapses (head dim 32->22).
+    Exposed as a CLI arg like demo.py; raising it leaves already-valid frames bit-identical
+    (the table is arange-indexed, so existing rows don't change) and only extends the tail.
     """
     model = GCTStream(
         img_size=native_size,
         patch_size=patch_size,
         enable_3d_rope=True,
-        max_frame_num=1024,
+        max_frame_num=max_frame_num,
         kv_cache_sliding_window=64,
         kv_cache_scale_frames=num_scale_frames,
         kv_cache_cross_frame_special=True,
@@ -140,7 +158,7 @@ def run_one(model, images, num_scale_frames, keyframe_interval, dtype, device, o
 
 
 def main():
-    p = argparse.ArgumentParser(description="Compare reconstruction across input resolutions")
+    p = argparse.ArgumentParser(description="Precompute streaming 3D reconstruction to .npz (feeds LAI)")
     p.add_argument("--model_path", required=True)
     p.add_argument("--image_folder", default=None)
     p.add_argument("--video_path", default=None)
@@ -157,11 +175,29 @@ def main():
     p.add_argument("--patch_size", type=int, default=14)
     p.add_argument("--num_scale_frames", type=int, default=8)
     p.add_argument("--keyframe_interval", type=int, default=1)
+    p.add_argument("--max_frame_num", type=int, default=1024,
+                   help="Sizes the 3D-RoPE frequency table (mirrors demo.py). With "
+                        "--keyframe_interval 1 the RoPE frame counter hits the clip's full "
+                        "frame count, so this must exceed it or inference crashes at frame "
+                        "max_frame_num. Raising it does not change earlier frames' output.")
     p.add_argument("--use_sdpa", action="store_true", default=False,
                    help="Use SDPA attention (no FlashInfer dependency).")
     p.add_argument("--offload", action="store_true", default=False,
                    help="Offload per-frame predictions to CPU during inference (cuts VRAM, "
                         "slightly slower). Lets you use more frames / higher res without OOM.")
+    p.add_argument("--mask_sky", action="store_true", default=False,
+                   help="Bake sky removal into the saved npz: zero out depth_conf over sky regions "
+                        "(via skyseg ONNX) so sky points drop under conf_threshold downstream. "
+                        "Recommended for LAI, where sky depth is garbage.")
+    p.add_argument("--skyseg_model_path", default="skyseg.onnx",
+                   help="Path to the sky-segmentation ONNX model (auto-downloaded if missing).")
+    p.add_argument("--sky_mask_dir", default=None,
+                   help="Directory to cache sky masks. Default: <out_dir>/sky_masks (caching speeds "
+                        "up repeated runs on the same frames).")
+    p.add_argument("--sky_mask_visualization_dir", default=None,
+                   help="If set, save per-frame (original | mask | overlay) panels here to eyeball "
+                        "whether the sky mask is correct. Per-resolution subfolder is added "
+                        "automatically.")
     p.add_argument("--out_dir", default="predictions/restest")
     p.add_argument("--log_path", default="results/benchmark_log.md",
                    help="Markdown file to append one row per resolution run (conditions + time/mem).")
@@ -199,6 +235,7 @@ def main():
     model = build_model(
         args.model_path, args.model_native_size, args.patch_size,
         args.num_scale_frames, args.use_sdpa, device,
+        max_frame_num=args.max_frame_num,
     )
 
     dtype = (torch.bfloat16 if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
@@ -231,6 +268,21 @@ def main():
             )
             preds, images_cpu = demo_mod.postprocess(predictions, images_used)
             vis = demo_mod.prepare_for_visualization(preds, images_cpu)
+            if args.mask_sky and "depth_conf" not in vis:
+                print("  Warning: no depth_conf in predictions; skipping --mask_sky for this run.")
+            elif args.mask_sky:
+                # Bake sky removal into the npz so every downstream consumer (LAIcrop, render_*,
+                # view_npz) sees sky-masked conf without re-running skyseg. apply_sky_segmentation
+                # resizes masks to this resolution's conf H/W internally.
+                sky_dir = args.sky_mask_dir or os.path.join(args.out_dir, "sky_masks")
+                # Per-resolution subfolder so masks at different H/W don't overwrite each other.
+                sky_vis_dir = (os.path.join(args.sky_mask_visualization_dir, str(s))
+                               if args.sky_mask_visualization_dir else None)
+                vis["depth_conf"] = apply_sky_segmentation(
+                    vis["depth_conf"], images=vis["images"], image_paths=paths,
+                    skyseg_model_path=args.skyseg_model_path, sky_mask_dir=sky_dir,
+                    sky_mask_visualization_dir=sky_vis_dir,
+                )
             out_path = os.path.join(args.out_dir, f"{scene}_{s}.npz")
             np.savez_compressed(out_path, **vis)
             fps_eff = images.shape[0] / secs if secs > 0 else 0.0
