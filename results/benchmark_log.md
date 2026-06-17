@@ -32,3 +32,8 @@ arange-indexed) and only extends the tail, so earlier npz files are unaffected.
 | 2026-06-10 17:28:43 | Strawberry_onebed | 705 | 10 | 644 | 644x364 | 19.66 | 4004.9 | 0.2 | Y | Y | 518 | 1 |
 | 2026-06-10 18:10:35 | Strawberry_oneside | 329 | 10 | 644 | 644x364 | 18.17 | 1909.4 | 0.2 | Y | Y | 518 | 1 |
 | 2026-06-10 19:34:36 | Watermelon_fullbed_straightview | 965 | 10 | 644 | 644x364 | 20.70 | 4634.8 | 0.2 | Y | Y | 518 | 1 |
+| 2026-06-12 18:30:22 | Watermelon_fullbed_sideview | 1058 | 10 | 644 | 644x364 | 21.07 | 6125.0 | 0.2 | Y | Y | 518 | 1 |
+| 2026-06-12 19:07:34 | Strawberry_flowercloseup | 204 | 10 | 644 | 644x364 | 17.69 | 1013.1 | 0.2 | Y | Y | 518 | 1 |
+| 2026-06-12 20:11:55 | Watermelon_pot_fruitcloseup | 516 | 10 | 644 | 644x364 | 18.91 | 3506.2 | 0.1 | Y | Y | 518 | 1 |
+| 2026-06-12 22:25:13 | closeup_plant | 833 | 10 | 644 | 644x364 | 20.17 | 7610.2 | 0.1 | Y | Y | 518 | 1 |
+| 2026-06-17 18:17:33 | 2124e8f5-ba9e-4fe2-8620-bdf58fc8dd66 | 46 | 10 | 644 | 644x476 | 14.55 | 105.2 | 0.4 | N | Y | 518 | 1 |
