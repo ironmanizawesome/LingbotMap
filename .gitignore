@@ -23,6 +23,9 @@ example/*_sky_masks/
 *.npz
 screenshot_*.png
 results/*.png
+results/**/*.png
+results/**/*.jpg
+results/test_pipeline.json
 sync_command.txt
 .claude-remote
 weights/
