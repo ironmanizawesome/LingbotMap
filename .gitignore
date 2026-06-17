@@ -33,3 +33,6 @@ weights/
 **/.DS_Store
 docs/
 
+
+# Local presentation demo video (large binary, kept out of git)
+test_vid.mp4
