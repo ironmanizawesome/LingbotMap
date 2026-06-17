@@ -92,9 +92,13 @@ class PointCloudViewer:
         sky_mask_dir: Optional[str] = None,
         sky_mask_visualization_dir: Optional[str] = None,
         depth_stride: int = 1,
+        start_static: bool = False,
     ):
         self.model = model
         self.size = size
+        # When True, show the whole reconstruction at once on load (no playback):
+        # timestep starts at the last frame and "Playing" starts off.
+        self.start_static = start_static
         self.state_args = state_args
         self.server = viser.ViserServer(host="0.0.0.0", port=port)
         self.server.gui.configure_theme(titlebar_content=None, control_layout="collapsible")
@@ -102,6 +106,7 @@ class PointCloudViewer:
         self.conf_list = conf_list
         self.vis_threshold = vis_threshold
         self.point_size = point_size
+        self.downsample_factor = downsample_factor
         self.tt = lambda x: torch.from_numpy(x).float().to(device)
 
         # Process the prediction dictionary to create pc_list, color_list, conf_list
@@ -409,7 +414,7 @@ class PointCloudViewer:
             "Camera Size", min=0.01, max=0.5, step=0.01, initial_value=0.1
         )
         self.downsample_slider = self.server.gui.add_slider(
-            "Downsample Factor", min=1, max=1000, step=1, initial_value=10
+            "Downsample Factor", min=1, max=1000, step=1, initial_value=self.downsample_factor
         )
         self.show_camera_checkbox = self.server.gui.add_checkbox(
             "Show Camera", initial_value=self.show_camera
@@ -1167,12 +1172,14 @@ class PointCloudViewer:
     def animate(self):
         """Setup and run animation controls."""
         with self.server.gui.add_folder("Playback"):
+            init_timestep = (self.num_frames - 1) if self.start_static else 0
             self.gui_timestep = self.server.gui.add_slider(
-                "Train Step", min=0, max=self.num_frames - 1, step=1, initial_value=0, disabled=False
+                "Train Step", min=0, max=self.num_frames - 1, step=1,
+                initial_value=init_timestep, disabled=False,
             )
             gui_next_frame = self.server.gui.add_button("Next Step", disabled=False)
             gui_prev_frame = self.server.gui.add_button("Prev Step", disabled=False)
-            gui_playing = self.server.gui.add_checkbox("Playing", True)
+            gui_playing = self.server.gui.add_checkbox("Playing", not self.start_static)
             gui_framerate = self.server.gui.add_slider("FPS", min=1, max=60, step=0.1, initial_value=20)
             gui_framerate_options = self.server.gui.add_button_group("FPS options", ("10", "20", "30", "60"))
 

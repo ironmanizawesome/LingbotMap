@@ -15,6 +15,9 @@ def main():
     ap.add_argument("--point_size", type=float, default=0.00001)
     ap.add_argument("--image_folder", default=None,
                     help="Original image folder (only needed if you want to re-apply sky masks).")
+    ap.add_argument("--animate", action="store_true",
+                    help="Start in playback mode (accumulate frames over time). "
+                         "Default: show the whole reconstruction at once.")
     args = ap.parse_args()
 
     data = np.load(args.npz, allow_pickle=True)
@@ -29,6 +32,7 @@ def main():
         point_size=args.point_size,
         mask_sky=False,
         image_folder=args.image_folder,
+        start_static=not args.animate,
     )
     print(f"3D viewer at http://localhost:{args.port}")
     viewer.run()
