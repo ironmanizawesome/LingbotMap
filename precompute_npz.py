@@ -180,6 +180,15 @@ def main():
                         "--keyframe_interval 1 the RoPE frame counter hits the clip's full "
                         "frame count, so this must exceed it or inference crashes at frame "
                         "max_frame_num. Raising it does not change earlier frames' output.")
+    p.add_argument("--max_frames", type=int, default=0,
+                   help="Uniformly subsample extracted frames to at most N (0=disabled). "
+                        "Caps VRAM for long clips while still covering the whole video "
+                        "(unlike --first_k, which keeps only the leading frames).")
+    p.add_argument("--max_height", type=int, default=0,
+                   help="Center-crop preprocessed frames to at most this height in px "
+                        "(must be a multiple of patch_size; 0=disabled). Caps tokens/VRAM "
+                        "for tall 4:3/portrait clips so they match the lighter 16:9 "
+                        "(e.g. 644x364) profile without dropping any frames.")
     p.add_argument("--use_sdpa", action="store_true", default=False,
                    help="Use SDPA attention (no FlashInfer dependency).")
     p.add_argument("--offload", action="store_true", default=False,
@@ -225,11 +234,34 @@ def main():
         fps=args.fps, first_k=args.first_k, stride=args.stride,
         image_size=sizes[0], patch_size=args.patch_size,
     )
+    # Cap frame count to fit VRAM: uniformly subsample across the WHOLE clip if over
+    # --max_frames (keeps full temporal coverage, just sparser). Done once, before
+    # other resolutions reuse `paths`, so every size sees the identical frame set.
+    if args.max_frames and images0.shape[0] > args.max_frames:
+        import numpy as _np
+        sel = _np.linspace(0, images0.shape[0] - 1, args.max_frames).round().astype(int)
+        images0 = images0[sel]
+        paths = [paths[i] for i in sel]
+        print(f"Subsampled to {args.max_frames} frames (uniform, full-clip) to fit memory")
+
     preprocessed = {sizes[0]: images0}
     for s in sizes[1:]:
         preprocessed[s] = load_and_preprocess_images(
             paths, mode="crop", image_size=s, patch_size=args.patch_size,
         )
+
+    # Center-crop tall clips down to --max_height so 4:3/portrait videos carry the same
+    # token budget as the lighter 16:9 (e.g. 644x364) runs — no frames dropped, only the
+    # top/bottom margin (often sky/ground) trimmed. Applied to every resolution alike.
+    if args.max_height:
+        for s in list(preprocessed.keys()):
+            imgs = preprocessed[s]
+            h = imgs.shape[-2]
+            if h > args.max_height:
+                top = (h - args.max_height) // 2
+                preprocessed[s] = imgs[..., top:top + args.max_height, :]
+                if s == sizes[0]:
+                    print(f"Center-cropped height {h} -> {args.max_height} px (caps tall-clip VRAM)")
 
     # ── Build the model ONCE at native size ───────────────────────────────────────────
     model = build_model(
