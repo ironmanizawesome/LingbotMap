@@ -202,6 +202,7 @@ def run_pipeline(
             "comp_index": i,
             "n_points": int(comp["n_points"]),
             "footprint_area_m2": float(comp["footprint_area_m2"]),
+            "centroid_uv": [round(float(x), 4) for x in comp.get("centroid_uv", (0.0, 0.0))],
             # footprint (scale-robust)
             "leaf_proj_area_m2": float(f["leaf_proj_area_m2"]),
             "ground_area_m2": float(f["ground_area_m2"]),
