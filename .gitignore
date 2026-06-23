@@ -36,3 +36,11 @@ docs/
 
 # Local presentation demo video (large binary, kept out of git)
 test_vid.mp4
+
+# Presentation / speaker materials — kept local only, purged from history
+presentation_draft.md
+presentation_lai_service.html
+presentation_lai_service.md
+presentation_script.html
+presentation_lai_service.pdf
+trend_demo.html
