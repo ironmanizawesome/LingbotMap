@@ -114,6 +114,7 @@ Where to obtain and how to prepare each dataset's raw data (see the matching `co
 - **VBR** — follow the preprocessing in [Junyi42/LoGeR](https://github.com/Junyi42/LoGeR) to obtain the aligned data.
 - **TUM RGB-D** — download sequences from the [TUM RGB-D benchmark](https://cvg.cit.tum.de/data/datasets/rgbd-dataset/download).
 - **KITTI** — download the odometry sequences from the [KITTI odometry benchmark](https://www.cvlibs.net/datasets/kitti/eval_odometry.php).
+- **TAT** - download the Barn, Caterpillar, Church, Ignatius, Meeting room and Truck from [TAT](https://www.tanksandtemples.org/download/), including ground truth and image set.
 
 ### VBR and DROID-W
 

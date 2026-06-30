@@ -118,6 +118,7 @@ conda run -n lingbot_map python run_worker.py \
 - **VBR** —— 按 [Junyi42/LoGeR](https://github.com/Junyi42/LoGeR) 的预处理流程得到对齐后的数据。
 - **TUM RGB-D** —— 从 [TUM RGB-D benchmark](https://cvg.cit.tum.de/data/datasets/rgbd-dataset/download) 下载序列。
 - **KITTI** —— 从 [KITTI odometry benchmark](https://www.cvlibs.net/datasets/kitti/eval_odometry.php) 下载里程计序列。
+- TAT - 下载 Barn, Caterpillar, Church, Ignatius, Meeting room and Truck 从 [TAT](https://www.tanksandtemples.org/download/), 包括 ground truth 和 image set.
 
 ### VBR 与 DROID-W
 

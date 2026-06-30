@@ -82,9 +82,9 @@ LingBot-Map has focused on:
   - ✅ NRGBD dataset
 - ✅ Release demo scripts
   - ✅ Indoor long-video demo ([Featured indoor walkthrough](#-featured-indoor-walkthrough-25-000-frames-13-minutes))
-  - ⬜ Outdoor long-video demo
-  - ⬜ LingBot-World demo
-  - ⬜ Aerial long-video demo
+  - ✅ Outdoor long-video demo
+  - ✅ LingBot-World demo
+  - ✅ Aerial long-video demo
 
 ---
 
