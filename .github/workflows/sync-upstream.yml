@@ -1,0 +1,62 @@
+name: Sync upstream
+
+# upstream(Robbyant/lingbot-map)의 새 커밋을 이 포크의 main으로 자동 동기화.
+#  - 깨끗하게 머지되면 origin/main에 바로 push
+#  - 충돌나면 sync-upstream/<timestamp> 브랜치 + PR을 만들어 수동으로 해결
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 매일 18:00 UTC = 03:00 KST
+  workflow_dispatch:        # 수동 실행 허용
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/Robbyant/lingbot-map.git
+          git fetch upstream main
+
+      - name: Merge upstream/main
+        id: merge
+        run: |
+          if git merge --no-edit upstream/main; then
+            echo "result=clean" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push to origin/main (clean merge)
+        if: steps.merge.outputs.result == 'clean'
+        run: git push origin HEAD:main
+
+      - name: Open PR (conflict)
+        if: steps.merge.outputs.result == 'conflict'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="sync-upstream/$(date -u +%Y%m%d-%H%M%S)"
+          git checkout -b "$branch"
+          git merge --no-edit upstream/main || true
+          git add -A
+          git commit -m "ci(sync): merge upstream/main — conflicts need manual resolution"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Sync upstream (manual conflict resolution needed)" \
+            --body "upstream/main 자동 머지 중 충돌이 발생했습니다. 이 브랜치에서 충돌 마커를 해결한 뒤 머지하세요."
