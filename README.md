@@ -394,6 +394,7 @@ This builds `voxel_morton_ext` and `frustum_cull_ext` in place — both are impo
 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f4f5e555-22a8-4cc9-b380-dfde5fe1c809" />
 
+You can also try to change --keyframe_interval to --image_stride for fast inference and renderding.
 
 Flag-by-flag rationale:
 
