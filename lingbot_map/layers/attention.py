@@ -629,28 +629,39 @@ class SDPAAttention(Attention):
             camera_token_idx = 0
             scale_token_idx = camera_token_idx + num_register_tokens + 1
 
-            if kv_cache[f"k_{global_idx}"] is None:
-                kv_cache[f"k_{global_idx}"] = k.view(B, self.num_heads, num_frame_per_block,
-                                                     N // num_frame_per_block, self.head_dim)
-                kv_cache[f"v_{global_idx}"] = v.view(B, self.num_heads, num_frame_per_block,
-                                                     N // num_frame_per_block, self.head_dim)
-            else:
+            # Check if we should skip appending to cache (non-keyframe in keyframe mode)
+            skip_append = kv_cache.get("_skip_append", False)
+
+            if kv_cache[f"k_{global_idx}"] is not None:
                 num_frame_per_block = k.shape[2] // kv_cache[f"k_{global_idx}"].shape[3]
-                kv_cache[f"k_{global_idx}"] = torch.cat((
-                    kv_cache[f"k_{global_idx}"],
-                    k.view(B, self.num_heads, num_frame_per_block, N // num_frame_per_block, self.head_dim)
-                ), dim=2)
-                kv_cache[f"v_{global_idx}"] = torch.cat((
-                    kv_cache[f"v_{global_idx}"],
-                    v.view(B, self.num_heads, num_frame_per_block, N // num_frame_per_block, self.head_dim)
-                ), dim=2)
+            k_reshaped = k.view(B, self.num_heads, num_frame_per_block,
+                                N // num_frame_per_block, self.head_dim)
+            v_reshaped = v.view(B, self.num_heads, num_frame_per_block,
+                                N // num_frame_per_block, self.head_dim)
 
-            self._apply_kv_cache_eviction(
-                kv_cache, global_idx, camera_token_idx, scale_token_idx, num_register_tokens
-            )
+            if not skip_append:
+                # KEYFRAME: store in cache (original behavior)
+                if kv_cache[f"k_{global_idx}"] is None:
+                    kv_cache[f"k_{global_idx}"] = k_reshaped
+                    kv_cache[f"v_{global_idx}"] = v_reshaped
+                else:
+                    kv_cache[f"k_{global_idx}"] = torch.cat((kv_cache[f"k_{global_idx}"], k_reshaped), dim=2)
+                    kv_cache[f"v_{global_idx}"] = torch.cat((kv_cache[f"v_{global_idx}"], v_reshaped), dim=2)
 
-            k_cached = kv_cache[f"k_{global_idx}"].clone()
-            v_cached = kv_cache[f"v_{global_idx}"].clone()
+                self._apply_kv_cache_eviction(
+                    kv_cache, global_idx, camera_token_idx, scale_token_idx, num_register_tokens
+                )
+
+                k_cached = kv_cache[f"k_{global_idx}"].clone()
+                v_cached = kv_cache[f"v_{global_idx}"].clone()
+            else:
+                # NON-KEYFRAME: attend to [cached + current] without storing in cache
+                if kv_cache[f"k_{global_idx}"] is not None:
+                    k_cached = torch.cat((kv_cache[f"k_{global_idx}"], k_reshaped), dim=2)
+                    v_cached = torch.cat((kv_cache[f"v_{global_idx}"], v_reshaped), dim=2)
+                else:
+                    k_cached = k_reshaped
+                    v_cached = v_reshaped
             a, b, c, d, e = k_cached.shape
             k_full = k_cached.reshape(a, b, c * d, e)
             v_full = v_cached.reshape(a, b, c * d, e)

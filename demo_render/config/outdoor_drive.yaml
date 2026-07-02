@@ -18,14 +18,14 @@ camera:
   transition: 40
   segments:
     - mode: follow
-      frames: [0, 750]
+      frames: [0, 3000]
       back_offset: 0.2
       up_offset: 0.05
       look_offset: 0.5
       smooth_window: 60
       scale_frames: 100
     - mode: birdeye              # 升到空中俯瞰全貌
-      frames: [750, -1]
+      frames: [3000, -1]
       reveal_height_mult: 2.5
 
 render:
