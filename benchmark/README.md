@@ -2,6 +2,8 @@
 
 A benchmark framework for evaluating depth estimation, camera pose, and point cloud reconstruction methods. The pipeline has three phases -- **prepare** (raw data to BSS format), **run** (execute methods), **evaluate** (compute metrics) -- plus optional **report** generation.
 
+**We use lingbot-map.pt by default in the evaluation benchmark.**
+
 ---
 
 ## Table of Contents
