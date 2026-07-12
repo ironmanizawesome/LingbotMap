@@ -15,8 +15,8 @@ camera:
   fov: 60.0
   transition: 30
   segments:
-    # - mode: follow。           # 相机跟随
-    #   frames: [0, 1500]
+    # - mode: follow           # 相机跟随
+    #   frames: [0, 2000]
     #   back_offset: 0.3
     #   up_offset: 0.08
     #   look_offset: 0.4
