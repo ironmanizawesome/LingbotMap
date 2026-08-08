@@ -617,7 +617,6 @@ def main():
             sky_mask_dir=args.sky_mask_dir,
             sky_mask_visualization_dir=args.sky_mask_visualization_dir,
         )
-        print(f"3D viewer at http://localhost:{args.port}")
         viewer.run()
     except ImportError:
         print("viser not installed. Install with: pip install lingbot-map[vis]")

@@ -22,6 +22,7 @@ except ImportError:
 _SKYSEG_INPUT_SIZE = (320, 320)
 _SKYSEG_SOFT_THRESHOLD = 0.1
 _SKYSEG_CACHE_VERSION = "imagenet_norm_softmap_inverted_v3"
+_SKYSEG_MODEL_URL = "https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx"
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +256,82 @@ def segment_sky(
 
 
 # ---------------------------------------------------------------------------
+# Model acquisition
+# ---------------------------------------------------------------------------
+
+def download_skyseg_model(output_path: str = "skyseg.onnx") -> str:
+    """Download the sky segmentation model from Hugging Face."""
+    import tempfile
+
+    import requests
+
+    print(f"Downloading sky segmentation model from {_SKYSEG_MODEL_URL}...")
+    response = requests.get(_SKYSEG_MODEL_URL, stream=True)
+    temp_path = None
+    try:
+        response.raise_for_status()
+        total_size = int(response.headers.get("content-length", 0))
+        output_dir = os.path.dirname(output_path) or "."
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=output_dir,
+            prefix=f".{os.path.basename(output_path)}.",
+            suffix=".tmp",
+            delete=False,
+        ) as model_file:
+            temp_path = model_file.name
+            with tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                desc="Downloading",
+            ) as progress:
+                for chunk in response.iter_content(chunk_size=8192):
+                    model_file.write(chunk)
+                    progress.update(len(chunk))
+
+        os.replace(temp_path, output_path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        try:
+            response.close()
+        except Exception:
+            pass
+
+    print(f"Model saved to {output_path}")
+    return output_path
+
+
+def _ensure_skyseg_model(skyseg_model_path: str) -> None:
+    """Download the skyseg model when the requested path is not a regular file."""
+    if os.path.isfile(skyseg_model_path):
+        return
+
+    print(f"Sky segmentation model not found at {skyseg_model_path}, downloading...")
+    try:
+        download_skyseg_model(skyseg_model_path)
+    except Exception as error:
+        raise RuntimeError(
+            f"Failed to download the sky segmentation model to {skyseg_model_path} "
+            f"from {_SKYSEG_MODEL_URL}: {error}. Download it manually from "
+            f"{_SKYSEG_MODEL_URL} and set skyseg_model_path to the downloaded model file."
+        ) from error
+
+    if not os.path.isfile(skyseg_model_path):
+        raise RuntimeError(
+            f"Sky segmentation model download to {skyseg_model_path} from "
+            f"{_SKYSEG_MODEL_URL} completed, but no model file was created. "
+            f"Download it manually from {_SKYSEG_MODEL_URL} and set "
+            "skyseg_model_path to the downloaded model file."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -286,9 +363,7 @@ def load_or_create_sky_masks(
         print("Warning: Neither image_folder/image_paths nor images provided, skipping sky segmentation")
         return None
 
-    if not os.path.exists(skyseg_model_path):
-        print(f"Warning: Sky segmentation model not found at {skyseg_model_path}")
-        return None
+    _ensure_skyseg_model(skyseg_model_path)
 
     skyseg_session = onnxruntime.InferenceSession(skyseg_model_path)
     sky_masks: List[np.ndarray] = []

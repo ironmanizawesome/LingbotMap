@@ -270,7 +270,13 @@ pip install onnxruntime        # CPU
 pip install onnxruntime-gpu    # GPU (faster for large image sets)
 ```
 
-The sky segmentation model (`skyseg.onnx`) will be automatically downloaded from [HuggingFace](https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx) on first use.
+The sky segmentation model (`skyseg.onnx`) will be automatically downloaded from [HuggingFace](https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx) on first use. If the download fails or does not produce a regular file, sky masking stops with a `RuntimeError` that reports the model path, download URL, cause, and manual setup guidance; it never silently continues without masking. For manual recovery, download the model as `skyseg.onnx` in the directory from which you run the command, because root `demo.py` resolves its default model path relative to the current working directory:
+
+```bash
+wget -O skyseg.onnx https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx
+python demo.py --model_path /path/to/checkpoint.pt \
+    --image_folder /path/to/images/ --mask_sky
+```
 
 **Usage:**
 
@@ -343,6 +349,8 @@ pip install -e ".[vis,render]"
 ```bash
 pip install onnxruntime-gpu
 ```
+
+The offline pipeline has the same first-use model download and fatal failure behavior described in [Sky Masking](#sky-masking). Use `--skyseg_model_path /absolute/path/to/skyseg.onnx` with `demo_render/batch_demo.py`; for standalone `demo_render/rgbd_scan_render.py`, use `--sky_model /absolute/path/to/skyseg.onnx` on the command line or set `preprocess.sky_model` in YAML.
 
 **2. Kaolin** — matches the PyTorch 2.8.0 + CUDA 12.8 recommended above:
 

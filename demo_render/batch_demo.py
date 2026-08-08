@@ -733,13 +733,25 @@ def export_glb(predictions, output_path, args):
     """Export predictions to GLB."""
     from lingbot_map.vis import predictions_to_glb
 
+    prediction_mode = (
+        "Predicted Pointmap"
+        if getattr(args, "use_point_map", False)
+        else "Predicted Depthmap"
+    )
+    artifact_name = os.path.splitext(os.path.basename(output_path))[0]
+    sky_mask_dir, sky_mask_visualization_dir = get_sky_artifact_dirs(
+        args, artifact_name
+    )
     scene = predictions_to_glb(
         predictions,
         conf_thres=args.conf_threshold,
         filter_by_frames="all",
         mask_sky=args.mask_sky,
         target_dir=os.path.dirname(output_path),
-        prediction_mode="Predicted Pointmap",
+        prediction_mode=prediction_mode,
+        skyseg_model_path=getattr(args, "skyseg_model_path", "skyseg.onnx"),
+        sky_mask_dir=sky_mask_dir,
+        sky_mask_visualization_dir=sky_mask_visualization_dir,
     )
     scene.export(output_path)
     print(f"GLB saved to {output_path}")
@@ -976,15 +988,15 @@ def process_scene(args, scene_name, image_folder, model, device, video_images=No
         # of per-frame files; it returns the actual output path.
         saved_npz_path = save_predictions_npz(predictions, npz_path)
 
-        if args.save_glb:
-            export_glb(predictions, glb_path, args)
-
         if not args.no_render:
             print(f"Rendering video to {video_path}...")
             if not render_with_pipeline(
                 saved_npz_path, video_path, args, artifact_name=scene_name,
             ):
                 raise RuntimeError("Video rendering failed")
+
+        if args.save_glb:
+            export_glb(predictions, glb_path, args)
 
         # Clean up NPZ if user didn't explicitly request saving
         if not args.save_predictions and os.path.exists(saved_npz_path):
@@ -1023,13 +1035,13 @@ def render_npz_file(args, npz_path):
         result["output_video"] = video_path
         result["output_glb"] = glb_path if args.save_glb else None
 
-        if args.save_glb:
-            export_glb(predictions, glb_path, args)
-
         if not args.no_render:
             print(f"Rendering {npz_path} -> {video_path}")
             if not render_with_pipeline(npz_path, video_path, args, artifact_name=name):
                 raise RuntimeError("Video rendering failed")
+
+        if args.save_glb:
+            export_glb(predictions, glb_path, args)
 
         result["success"] = True
     except Exception as exc:

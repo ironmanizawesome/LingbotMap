@@ -17,12 +17,12 @@ import cv2
 import matplotlib
 from scipy.spatial.transform import Rotation
 
+from lingbot_map.utils.geometry import unproject_depth_map_to_point_map
 from lingbot_map.vis.sky_segmentation import (
     _SKYSEG_INPUT_SIZE,
-    _SKYSEG_SOFT_THRESHOLD,
-    _mask_to_float,
     _mask_to_uint8,
     _result_map_to_non_sky_conf,
+    apply_sky_segmentation,
 )
 
 try:
@@ -42,16 +42,23 @@ def predictions_to_glb(
     mask_sky: bool = False,
     target_dir: Optional[str] = None,
     prediction_mode: str = "Predicted Pointmap",
+    skyseg_model_path: str = "skyseg.onnx",
+    sky_mask_dir: Optional[str] = None,
+    sky_mask_visualization_dir: Optional[str] = None,
 ) -> "trimesh.Scene":
     """
     Converts GCT predictions to a 3D scene represented as a GLB file.
 
     Args:
         predictions: Dictionary containing model predictions with keys:
-            - world_points: 3D point coordinates (S, H, W, 3)
-            - world_points_conf: Confidence scores (S, H, W)
+            - world_points: Optional 3D point coordinates (S, H, W, 3)
+            - world_points_conf: Optional point confidence scores (S, H, W)
+            - depth: Depth maps used when world_points is unavailable
+              (S, H, W) or (S, H, W, 1)
+            - depth_conf: Optional depth confidence scores (S, H, W)
+            - intrinsic: Camera intrinsic matrices (S, 3, 3)
             - images: Input images (S, H, W, 3) or (S, 3, H, W)
-            - extrinsic: Camera extrinsic matrices (S, 3, 4)
+            - extrinsic: World-to-camera matrices (S, 3, 4)
         conf_thres: Percentage of low-confidence points to filter out
         filter_by_frames: Frame filter specification ("all" or frame index)
         mask_black_bg: Mask out black background pixels
@@ -60,6 +67,9 @@ def predictions_to_glb(
         mask_sky: Apply sky segmentation mask
         target_dir: Output directory for intermediate files
         prediction_mode: "Predicted Pointmap" or "Predicted Depthmap"
+        skyseg_model_path: Path to the sky segmentation ONNX model
+        sky_mask_dir: Optional directory for cached sky masks
+        sky_mask_visualization_dir: Optional directory for mask visualizations
 
     Returns:
         trimesh.Scene: Processed 3D scene containing point cloud and cameras
@@ -90,20 +100,20 @@ def predictions_to_glb(
     # Select prediction source
     if "Pointmap" in prediction_mode:
         print("Using Pointmap Branch")
-        if "world_points" in predictions:
+        if predictions.get("world_points") is not None:
             pred_world_points = predictions["world_points"]
             pred_world_points_conf = predictions.get(
                 "world_points_conf", np.ones_like(pred_world_points[..., 0])
             )
         else:
             print("Warning: world_points not found, falling back to depth-based points")
-            pred_world_points = predictions["world_points_from_depth"]
+            pred_world_points = _get_depth_based_world_points(predictions)
             pred_world_points_conf = predictions.get(
                 "depth_conf", np.ones_like(pred_world_points[..., 0])
             )
     else:
         print("Using Depthmap and Camera Branch")
-        pred_world_points = predictions["world_points_from_depth"]
+        pred_world_points = _get_depth_based_world_points(predictions)
         pred_world_points_conf = predictions.get(
             "depth_conf", np.ones_like(pred_world_points[..., 0])
         )
@@ -112,9 +122,14 @@ def predictions_to_glb(
     camera_matrices = predictions["extrinsic"]
 
     # Apply sky segmentation if enabled
-    if mask_sky and target_dir is not None:
+    if mask_sky:
         pred_world_points_conf = _apply_sky_mask(
-            pred_world_points_conf, target_dir, images
+            pred_world_points_conf,
+            target_dir,
+            images,
+            skyseg_model_path=skyseg_model_path,
+            sky_mask_dir=sky_mask_dir,
+            sky_mask_visualization_dir=sky_mask_visualization_dir,
         )
 
     # Apply frame filter
@@ -194,54 +209,56 @@ def predictions_to_glb(
     return scene_3d
 
 
-def _apply_sky_mask(
-    conf: np.ndarray,
-    target_dir: str,
-    images: np.ndarray
-) -> np.ndarray:
-    """Apply sky segmentation mask to confidence scores."""
-    try:
-        import onnxruntime
-    except ImportError:
-        print("Warning: onnxruntime not available, skipping sky masking")
-        return conf
+def _get_depth_based_world_points(predictions: dict) -> np.ndarray:
+    """Return depth-unprojected world points, computing them when necessary."""
+    precomputed = predictions.get("world_points_from_depth")
+    if precomputed is not None:
+        return precomputed
 
-    target_dir_images = os.path.join(target_dir, "images")
-    if not os.path.exists(target_dir_images):
-        print(f"Warning: Images directory not found at {target_dir_images}")
-        return conf
-
-    image_list = sorted(os.listdir(target_dir_images))
-    S, H, W = conf.shape if hasattr(conf, "shape") else (len(images), images.shape[1], images.shape[2])
-
-    skyseg_model_path = "skyseg.onnx"
-    if not os.path.exists(skyseg_model_path):
-        print("Downloading skyseg.onnx...")
-        download_file_from_url(
-            "https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx",
-            skyseg_model_path
+    required_keys = ("depth", "extrinsic", "intrinsic")
+    missing_keys = [
+        key for key in required_keys if predictions.get(key) is None
+    ]
+    if missing_keys:
+        missing = ", ".join(missing_keys)
+        raise ValueError(
+            "Depth-based GLB export requires depth, extrinsic, and intrinsic "
+            f"predictions; missing: {missing}"
         )
 
-    skyseg_session = onnxruntime.InferenceSession(skyseg_model_path)
-    sky_mask_list = []
+    print("Unprojecting depth maps for GLB export")
+    return unproject_depth_map_to_point_map(
+        predictions["depth"],
+        predictions["extrinsic"],
+        predictions["intrinsic"],
+    )
 
-    for i, image_name in enumerate(image_list[:S]):
-        image_filepath = os.path.join(target_dir_images, image_name)
-        mask_filepath = os.path.join(target_dir, "sky_masks", image_name)
 
-        if os.path.exists(mask_filepath):
-            sky_mask = cv2.imread(mask_filepath, cv2.IMREAD_GRAYSCALE)
-        else:
-            sky_mask = segment_sky(image_filepath, skyseg_session, mask_filepath)
+def _apply_sky_mask(
+    conf: np.ndarray,
+    target_dir: Optional[str],
+    images: np.ndarray,
+    skyseg_model_path: str = "skyseg.onnx",
+    sky_mask_dir: Optional[str] = None,
+    sky_mask_visualization_dir: Optional[str] = None,
+) -> np.ndarray:
+    """Apply sky segmentation mask to confidence scores."""
+    image_folder = None
+    if target_dir is not None:
+        candidate = os.path.join(target_dir, "images")
+        if os.path.isdir(candidate):
+            image_folder = candidate
+        if sky_mask_dir is None:
+            sky_mask_dir = os.path.join(target_dir, "sky_masks")
 
-        if sky_mask.shape[0] != H or sky_mask.shape[1] != W:
-            sky_mask = cv2.resize(sky_mask, (W, H), interpolation=cv2.INTER_LINEAR)
-
-        sky_mask_list.append(_mask_to_float(sky_mask))
-
-    sky_mask_array = np.array(sky_mask_list)
-    sky_mask_binary = (sky_mask_array > _SKYSEG_SOFT_THRESHOLD).astype(np.float32)
-    return conf * sky_mask_binary
+    return apply_sky_segmentation(
+        conf,
+        image_folder=image_folder,
+        images=images,
+        skyseg_model_path=skyseg_model_path,
+        sky_mask_dir=sky_mask_dir,
+        sky_mask_visualization_dir=sky_mask_visualization_dir,
+    )
 
 
 def integrate_camera_into_scene(
