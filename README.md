@@ -344,13 +344,27 @@ For those constrained by limited VRAM or GPU usage, you may also refer to the im
 pip install -e ".[vis,render]"
 ```
 
-`render` pulls in `open3d>=0.19` and `pyyaml` (the core `numpy<2` constraint comes from the base `lingbot-map` install). Sky masking in this pipeline uses `onnxruntime-gpu` for batched segmentation; install it if you don't already have the CPU `onnxruntime`:
+`render` pulls in `open3d>=0.19` and `pyyaml` (the core `numpy<2`
+constraint comes from the base `lingbot-map` install). Sky masking in this
+pipeline uses `onnxruntime-gpu` with the dynamic-batch
+`skyseg_batch.onnx` published in the
+[`robbyant/lingbot-map`](https://huggingface.co/robbyant/lingbot-map)
+model repository:
 
 ```bash
 pip install onnxruntime-gpu
+wget -O skyseg_batch.onnx \
+  https://huggingface.co/robbyant/lingbot-map/resolve/main/skyseg_batch.onnx
 ```
 
-The offline pipeline has the same first-use model download and fatal failure behavior described in [Sky Masking](#sky-masking). Use `--skyseg_model_path /absolute/path/to/skyseg.onnx` with `demo_render/batch_demo.py`; for standalone `demo_render/rgbd_scan_render.py`, use `--sky_model /absolute/path/to/skyseg.onnx` on the command line or set `preprocess.sky_model` in YAML.
+The offline renderer downloads `skyseg_batch.onnx` automatically when its
+configured path is missing. Use
+`--skyseg_model_path /absolute/path/to/skyseg_batch.onnx` with
+`demo_render/batch_demo.py`; for standalone
+`demo_render/rgbd_scan_render.py`, use
+`--sky_model /absolute/path/to/skyseg_batch.onnx` or set
+`preprocess.sky_model` in YAML. The single-image root `demo.py` continues to
+use `skyseg.onnx`.
 
 **2. Kaolin** — matches the PyTorch 2.8.0 + CUDA 12.8 recommended above:
 

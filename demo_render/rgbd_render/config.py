@@ -46,7 +46,7 @@ class SceneConfig:
 @dataclass
 class PreprocessConfig:
     mask_sky: bool = False
-    sky_model: str = 'skyseg.onnx'
+    sky_model: str = 'skyseg_batch.onnx'
     sky_batch_size: int = 32
     conf_threshold: float = 0.0
     vis_threshold: float = 4.0

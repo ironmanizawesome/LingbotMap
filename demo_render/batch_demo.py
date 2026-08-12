@@ -749,7 +749,7 @@ def export_glb(predictions, output_path, args):
         mask_sky=args.mask_sky,
         target_dir=os.path.dirname(output_path),
         prediction_mode=prediction_mode,
-        skyseg_model_path=getattr(args, "skyseg_model_path", "skyseg.onnx"),
+        skyseg_model_path=getattr(args, "skyseg_model_path", "skyseg_batch.onnx"),
         sky_mask_dir=sky_mask_dir,
         sky_mask_visualization_dir=sky_mask_visualization_dir,
     )
@@ -1167,7 +1167,7 @@ Examples:
     parser.add_argument("--vis_threshold", type=float, default=1.5)
     parser.add_argument("--conf_threshold", type=float, default=0.0)
     parser.add_argument("--mask_sky", action="store_true")
-    parser.add_argument("--skyseg_model_path", type=str, default="skyseg.onnx")
+    parser.add_argument("--skyseg_model_path", type=str, default="skyseg_batch.onnx")
     parser.add_argument("--sky_mask_dir", type=str, default=None)
     parser.add_argument("--sky_mask_visualization_dir", type=str, default=None)
     parser.add_argument(
@@ -1477,19 +1477,34 @@ def _run_inference_mode(args, parser, scenes, video_images=None):
     )
 
 
+def _explicit_cli_destinations(parser, argv):
+    """Return argparse destinations whose option strings appear in argv."""
+    supplied = set()
+    option_actions = parser._option_string_actions
+    for token in argv:
+        option = token.split("=", 1)[0]
+        action = option_actions.get(option)
+        if action is None and parser.allow_abbrev and option.startswith("--"):
+            matches = {
+                candidate_action
+                for candidate, candidate_action in option_actions.items()
+                if candidate.startswith(option)
+            }
+            if len(matches) == 1:
+                action = matches.pop()
+        if action is not None and action.dest != "help":
+            supplied.add(action.dest)
+    return supplied
+
+
 def main():
     parser = build_parser()
-    args = parser.parse_args()
+    argv = sys.argv[1:]
+    args = parser.parse_args(argv)
 
-    # Track which CLI args the user explicitly passed (vs. argparse defaults).
-    # Used by render_with_pipeline so a YAML preset (--config) only governs
-    # values the user did not override on the command line.
-    _arg_defaults = {a.dest: a.default for a in parser._actions
-                     if a.dest not in ('help',)}
-    args._user_supplied = {
-        k for k, v in vars(args).items()
-        if k != '_user_supplied' and v != _arg_defaults.get(k, None)
-    }
+    # Track option presence, not value inequality. An explicit value equal to
+    # the argparse default must still override a YAML preset.
+    args._user_supplied = _explicit_cli_destinations(parser, argv)
 
     if args.no_original_video:
         args.save_original_video = False

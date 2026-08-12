@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import glob
 import os
+from numbers import Integral
 from typing import List, Optional, Tuple
 
 import cv2
@@ -22,7 +23,7 @@ except ImportError:
 _SKYSEG_INPUT_SIZE = (320, 320)
 _SKYSEG_SOFT_THRESHOLD = 0.1
 _SKYSEG_CACHE_VERSION = "imagenet_norm_softmap_inverted_v3"
-_SKYSEG_MODEL_URL = "https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx"
+_SKYSEG_MODEL_URL = "https://huggingface.co/robbyant/lingbot-map/resolve/main/skyseg_batch.onnx"
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +155,45 @@ def _normalize_skyseg_output(raw: np.ndarray) -> np.ndarray:
     normed = (raw - min_value) / denom * 255.0
     return normed.astype(np.uint8)
 
+def _fixed_skyseg_batch_size(input_shape) -> Optional[int]:
+    """Return the model's required batch size, or None for a dynamic batch dimension."""
+    if not input_shape:
+        return None
+    batch_dimension = input_shape[0]
+    if (
+        isinstance(batch_dimension, Integral)
+        and not isinstance(batch_dimension, bool)
+        and batch_dimension > 0
+    ):
+        return int(batch_dimension)
+    return None
+
+
+def _skyseg_output_rows(onnx_result, expected_batch_size: int) -> np.ndarray:
+    """Extract and validate one score map per ONNX input row."""
+    if not isinstance(onnx_result, (list, tuple)) or not onnx_result:
+        raise ValueError("Sky segmentation inference returned no outputs")
+
+    raw = np.asarray(onnx_result[0])
+    if raw.ndim == 2:
+        raw = raw[np.newaxis]
+    elif raw.ndim == 4:
+        if raw.shape[1] == 0:
+            raise ValueError("Sky segmentation output has no channels")
+        raw = raw[:, -1]
+    elif raw.ndim != 3:
+        raise ValueError(
+            f"Unexpected sky segmentation output shape {raw.shape}; "
+            "expected (B, H, W) or (B, C, H, W)"
+        )
+
+    if raw.shape[0] != expected_batch_size:
+        raise ValueError(
+            f"Sky segmentation returned {raw.shape[0]} rows for "
+            f"{expected_batch_size} input rows"
+        )
+    return raw
+
 
 def run_skyseg(
     onnx_session,
@@ -177,26 +217,41 @@ def run_skyseg_batch(
     input_size: Tuple[int, int],
     images_bgr: List[np.ndarray],
 ) -> List[np.ndarray]:
-    """Run ONNX sky segmentation on a batch of BGR images. Returns list of uint8 score maps."""
+    """Run ONNX sky segmentation while honoring the model's declared batch dimension."""
     if not images_bgr:
         return []
-    batch = np.stack([_preprocess_skyseg(img, input_size) for img in images_bgr]).astype("float32")
 
-    input_name = onnx_session.get_inputs()[0].name
+    batch = np.stack(
+        [_preprocess_skyseg(img, input_size) for img in images_bgr]
+    ).astype("float32")
+    input_metadata = onnx_session.get_inputs()[0]
+    input_name = input_metadata.name
     output_name = onnx_session.get_outputs()[0].name
-    onnx_result = onnx_session.run([output_name], {input_name: batch})
+    fixed_batch_size = _fixed_skyseg_batch_size(input_metadata.shape)
 
-    raw = np.array(onnx_result)
-    # ONNX wraps output in a list -> (1, B, [C], H, W). Remove the list dim.
-    while raw.ndim > 3 and raw.shape[0] == 1:
-        raw = raw.squeeze(0)
-    # Now raw should be (B, H, W) or (B, C, H, W)
-    if raw.ndim == 4:
-        # Multi-channel output: take last channel (sky channel)
-        raw = raw[:, -1]
-    if raw.ndim == 2:
-        raw = raw[np.newaxis]
-    return [_normalize_skyseg_output(raw[i]) for i in range(raw.shape[0])]
+    inference_batch_size = fixed_batch_size or batch.shape[0]
+    score_maps: List[np.ndarray] = []
+    for start in range(0, batch.shape[0], inference_batch_size):
+        inference_batch = batch[start:start + inference_batch_size]
+        real_batch_size = inference_batch.shape[0]
+        if fixed_batch_size is not None and real_batch_size < fixed_batch_size:
+            padded_batch = np.empty(
+                (fixed_batch_size, *batch.shape[1:]), dtype=batch.dtype
+            )
+            padded_batch[:real_batch_size] = inference_batch
+            padded_batch[real_batch_size:] = inference_batch[-1]
+            inference_batch = padded_batch
+
+        onnx_result = onnx_session.run(
+            [output_name], {input_name: inference_batch}
+        )
+        raw_rows = _skyseg_output_rows(onnx_result, inference_batch.shape[0])
+        score_maps.extend(
+            _normalize_skyseg_output(raw_rows[i])
+            for i in range(real_batch_size)
+        )
+
+    return score_maps
 
 
 def segment_sky_from_array(
@@ -259,8 +314,8 @@ def segment_sky(
 # Model acquisition
 # ---------------------------------------------------------------------------
 
-def download_skyseg_model(output_path: str = "skyseg.onnx") -> str:
-    """Download the sky segmentation model from Hugging Face."""
+def download_skyseg_model(output_path: str = "skyseg_batch.onnx") -> str:
+    """Download the dynamic-batch sky segmentation model from Hugging Face."""
     import tempfile
 
     import requests
@@ -339,7 +394,7 @@ def load_or_create_sky_masks(
     image_folder: Optional[str] = None,
     image_paths: Optional[list[str]] = None,
     images: Optional[np.ndarray] = None,
-    skyseg_model_path: str = "skyseg.onnx",
+    skyseg_model_path: str = "skyseg_batch.onnx",
     sky_mask_dir: Optional[str] = None,
     sky_mask_visualization_dir: Optional[str] = None,
     target_shape: Optional[Tuple[int, int]] = None,

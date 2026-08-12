@@ -37,6 +37,28 @@ def _parse_kv_debug_interval(val: str) -> int:
     return max(0, n)
 
 
+def _build_streaming_frame_metadata(
+    batch_size: int,
+    sequence_length: int,
+    scale_frames: int,
+    keyframe_interval: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Build per-frame scale/keyframe metadata for streaming predictions."""
+    scale_frames = min(scale_frames, sequence_length)
+    interval = max(keyframe_interval, 1)
+
+    frame_type = torch.full(
+        (batch_size, sequence_length),
+        2,
+        dtype=torch.uint8,
+        device=device,
+    )
+    frame_type[:, :scale_frames] = 0
+    frame_type[:, scale_frames::interval] = 1
+    return frame_type, frame_type != 2
+
+
 @torch.no_grad()
 def _log_kv_stats(model, label: str = "") -> None:
     """One-line dump of aggregator KV cache occupancy + aux counters."""
@@ -387,6 +409,8 @@ class GCTStream(GCTBase):
                 - depth_conf: [B, S, H, W]
                 - world_points: [B, S, H, W, 3]
                 - world_points_conf: [B, S, H, W]
+                - frame_type: [B, S], uint8 (0=scale, 1=keyframe, 2=non-keyframe)
+                - is_keyframe: [B, S], bool (True for scale frames and keyframes)
         """
         # Normalize input shape
         if len(images.shape) == 4:
@@ -516,5 +540,15 @@ class GCTStream(GCTBase):
         # Apply prediction normalization if enabled
         if self.pred_normalization:
             predictions = self._normalize_predictions(predictions)
+
+        frame_type, is_keyframe = _build_streaming_frame_metadata(
+            batch_size=B,
+            sequence_length=S,
+            scale_frames=scale_frames,
+            keyframe_interval=keyframe_interval,
+            device=predictions["pose_enc"].device,
+        )
+        predictions["frame_type"] = frame_type
+        predictions["is_keyframe"] = is_keyframe
 
         return predictions

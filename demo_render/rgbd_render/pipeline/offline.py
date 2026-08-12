@@ -47,10 +47,7 @@ class OfflinePipeline:
         t0 = time.time()
         self._log(f"[render] Output: {output_dir}, workers: {self.cfg.num_workers}")
 
-        if self.cfg.num_workers > 1:
-            self._run_parallel(output_dir)
-        else:
-            self._run_serial(output_dir)
+        self._dispatch_render(output_dir)
 
         self._log(f"[render] Done in {time.time()-t0:.1f}s")
 
@@ -135,6 +132,19 @@ class OfflinePipeline:
             if frame is not None:
                 writer.write(frame)
         writer.release()
+
+    def _dispatch_render(self, output_dir: str):
+        """Select serial or multiprocessing rendering for this platform."""
+        if self.cfg.num_workers > 1 and os.name == 'nt':
+            self._log(
+                "[render] WARNING: Windows Open3D/SharedMemory multiprocessing "
+                "is unsupported/unreliable; using serial rendering instead.")
+            self._run_serial(output_dir)
+        elif self.cfg.num_workers > 1:
+            self._run_parallel(output_dir)
+        else:
+            self._run_serial(output_dir)
+
 
     def _run_serial(self, output_dir: str):
         """Render all frames in the main process."""
