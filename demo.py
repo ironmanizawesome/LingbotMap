@@ -407,6 +407,12 @@ def main():
     parser.add_argument("--downsample_factor", type=int, default=10)
     parser.add_argument("--point_size", type=float, default=0.00001)
     parser.add_argument("--mask_sky", action="store_true", help="Apply sky segmentation to filter out sky points")
+    parser.add_argument(
+        "--sky_model",
+        type=str,
+        default="skyseg.onnx",
+        help="Path to the sky segmentation ONNX model (default: skyseg.onnx; downloaded automatically if missing)",
+    )
     parser.add_argument("--sky_mask_dir", type=str, default=None,
                         help="Directory for cached sky masks (default: <image_folder>_sky_masks/)")
     parser.add_argument("--sky_mask_visualization_dir", type=str, default=None,
@@ -614,6 +620,7 @@ def main():
             point_size=args.point_size,
             mask_sky=args.mask_sky,
             image_folder=resolved_image_folder,
+            skyseg_model_path=args.sky_model,
             sky_mask_dir=args.sky_mask_dir,
             sky_mask_visualization_dir=args.sky_mask_visualization_dir,
         )
