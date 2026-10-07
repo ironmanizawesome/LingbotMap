@@ -1,0 +1,71 @@
+cff-version: 1.2.0
+message: "If you use LingBot-Map, please cite the paper below."
+title: "LingBot-Map: Geometric Context Transformer for Streaming 3D Reconstruction"
+repository-code: "https://github.com/robbyant/lingbot-map"
+url: "https://technology.robbyant.com/lingbot-map"
+license: Apache-2.0
+authors:
+  - family-names: Chen
+    given-names: Lin-Zhuo
+  - family-names: Gao
+    given-names: Jian
+  - family-names: Zhang
+    given-names: Shangzhan
+  - family-names: Chen
+    given-names: Yihang
+  - family-names: Xue
+    given-names: Nan
+  - family-names: Wang
+    given-names: Jianyuan
+  - family-names: Rupprecht
+    given-names: Christian
+  - family-names: Cao
+    given-names: Xun
+  - family-names: Zhu
+    given-names: Xing
+  - family-names: Shen
+    given-names: Yujun
+  - family-names: Yao
+    given-names: Yao
+  - family-names: Xu
+    given-names: Yinghao
+keywords:
+  - streaming 3D reconstruction
+  - feed-forward 3D foundation model
+  - geometric context transformer
+  - SLAM
+  - camera pose estimation
+preferred-citation:
+  type: conference-paper
+  title: "Geometric Context Transformer for Streaming 3D Reconstruction"
+  collection-title: "European Conference on Computer Vision (ECCV)"
+  publisher:
+    name: Springer
+  start: 293
+  end: 314
+  year: 2026
+  authors:
+    - family-names: Chen
+      given-names: Lin-Zhuo
+    - family-names: Gao
+      given-names: Jian
+    - family-names: Zhang
+      given-names: Shangzhan
+    - family-names: Chen
+      given-names: Yihang
+    - family-names: Xue
+      given-names: Nan
+    - family-names: Wang
+      given-names: Jianyuan
+    - family-names: Rupprecht
+      given-names: Christian
+    - family-names: Cao
+      given-names: Xun
+    - family-names: Zhu
+      given-names: Xing
+    - family-names: Shen
+      given-names: Yujun
+    - family-names: Yao
+      given-names: Yao
+    - family-names: Xu
+      given-names: Yinghao
