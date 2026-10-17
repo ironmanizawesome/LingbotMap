@@ -10,14 +10,15 @@ Robbyant Team
 
 <div align="center">
 
-[![Paper](https://img.shields.io/static/v1?label=Paper&message=arXiv&color=red&logo=arxiv)](https://arxiv.org/abs/2604.14141)
-[![PDF](https://img.shields.io/static/v1?label=Paper&message=PDF&color=red&logo=adobeacrobatreader)](lingbot-map_paper.pdf)
+[![Conference Version Paper](https://img.shields.io/static/v1?label=Conference%20Version&message=Paper&color=blue)](https://linzhuo.xyz/gct.pdf)
+[![Technical Report Version Paper](https://img.shields.io/static/v1?label=Technical%20Report%20Version&message=arXiv&color=red)](https://arxiv.org/abs/2604.14141)
 [![Project](https://img.shields.io/badge/Project-Website-blue)](https://technology.robbyant.com/lingbot-map)
 [![HuggingFace](https://img.shields.io/static/v1?label=%F0%9F%A4%97%20Model&message=HuggingFace&color=orange)](https://huggingface.co/robbyant/lingbot-map)
 [![ModelScope](https://img.shields.io/static/v1?label=%F0%9F%A4%96%20Model&message=ModelScope&color=purple)](https://www.modelscope.cn/models/Robbyant/lingbot-map)
 [![License](https://img.shields.io/badge/License-Apache--2.0-green)](LICENSE.txt)
 
 </div>
+
 
 https://github.com/user-attachments/assets/fe39e095-af2c-4ec9-b68d-a8ba97e505ab
 
@@ -135,7 +136,6 @@ pip install -e ".[vis]"
 
 | Model Name | Huggingface Repository | ModelScope Repository | Description |
 | :--- | :--- | :--- | :--- |
-| lingbot-map-long | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Better suited for long sequences and large scale scenes. |
 | lingbot-map | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Balanced checkpoint (used in paper, benchmark and offline demo) — trade off all-around performance across short and long sequences. |
 | lingbot-map-stage1 | [robbyant/lingbot-map](https://huggingface.co/robbyant/lingbot-map) | [Robbyant/lingbot-map](https://www.modelscope.cn/models/Robbyant/lingbot-map) | Stage-1 training checkpoint of lingbot-map — can be loaded into the VGGT model for bidirectional inference (c2w). |
 
@@ -270,7 +270,9 @@ pip install onnxruntime        # CPU
 pip install onnxruntime-gpu    # GPU (faster for large image sets)
 ```
 
-The sky segmentation model (`skyseg.onnx`) will be automatically downloaded from [HuggingFace](https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx) on first use. If the download fails or does not produce a regular file, sky masking stops with a `RuntimeError` that reports the model path, download URL, cause, and manual setup guidance; it never silently continues without masking. For manual recovery, download the model as `skyseg.onnx` in the directory from which you run the command, because root `demo.py` resolves its default model path relative to the current working directory:
+By default, root `demo.py` resolves the sky segmentation model as `skyseg.onnx` relative to the current working directory. If that default file is missing, it is automatically downloaded from [HuggingFace](https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx) on first use. If the download fails or does not produce a regular file, sky masking stops with a `RuntimeError` that reports the model path, download URL, cause, and manual setup guidance; it never silently continues without masking.
+
+For manual recovery while keeping the default path, download `skyseg.onnx` into the directory from which you run `demo.py`:
 
 ```bash
 wget -O skyseg.onnx https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx
@@ -278,11 +280,14 @@ python demo.py --model_path /path/to/checkpoint.pt \
     --image_folder /path/to/images/ --mask_sky
 ```
 
-**Usage:**
+**Usage with an explicit model path:**
+
+To use a model stored elsewhere, pass its absolute path with `--sky_model`:
 
 ```bash
 python demo.py --model_path /path/to/checkpoint.pt \
-    --image_folder /path/to/images/ --mask_sky
+    --image_folder /path/to/images/ --mask_sky \
+    --sky_model /absolute/path/to/skyseg.onnx
 ```
 
 Sky masks are cached in `<image_folder>_sky_masks/` so subsequent runs skip regeneration. You can also specify a custom cache directory with `--sky_mask_dir`, or save side-by-side mask visualizations with `--sky_mask_visualization_dir`:
@@ -425,6 +430,8 @@ Flag-by-flag rationale:
 | `--frame_tag --frame_tag_position top_right` | Stamp a `<i> / <N> Frames` counter in the top-right corner of the MP4. |
 | `--save_predictions` | Persist per-frame NPZs alongside the MP4. Useful for inspection or for re-rendering with different camera/overlay settings later. |
 
+
+#### Quick Mode and Demo Reproduction
 
 Replacing keyframe_interval = 10 with image_stride = 10 speeds up rendering. Then, uncomment the camera follow section in demo_render/config/indoor.yaml and set the birdeye's ranges to [2000, 2500] to reproduce the indoor fly-through effect shown in the demo:
 
@@ -595,12 +602,29 @@ This project is released under the Apache License 2.0. See [LICENSE](LICENSE.txt
 
 ## 📖 Citation
 
+If you use LingBot-Map in your research, please cite the ECCV 2026 paper:
+
+> Lin-Zhuo Chen, Jian Gao, Shangzhan Zhang, Yihang Chen, Nan Xue, Jianyuan Wang, Christian Rupprecht, Xun Cao, Xing Zhu, Yujun Shen, Yao Yao, and Yinghao Xu. **Geometric Context Transformer for Streaming 3D Reconstruction.** In *European Conference on Computer Vision (ECCV)*, pages 293–314. Springer, 2026.
+
 ```bibtex
-@article{chen2026geometric,
-  title={Geometric Context Transformer for Streaming 3D Reconstruction},
-  author={Chen, Lin-Zhuo and Gao, Jian and Chen, Yihang and Cheng, Ka Leong and Sun, Yipengjing and Hu, Liangxiao and Xue, Nan and Zhu, Xing and Shen, Yujun and Yao, Yao and Xu, Yinghao},
-  journal={arXiv preprint arXiv:2604.14141},
-  year={2026}
+@inproceedings{chen2026geometric,
+  title     = {Geometric Context Transformer for Streaming {3D} Reconstruction},
+  author    = {Chen, Lin-Zhuo and Gao, Jian and Zhang, Shangzhan and Chen, Yihang and Xue, Nan and Wang, Jianyuan and Rupprecht, Christian and Cao, Xun and Zhu, Xing and Shen, Yujun and Yao, Yao and Xu, Yinghao},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  pages     = {293--314},
+  year      = {2026},
+  publisher = {Springer}
+}
+```
+
+The extended technical report (LingBot-Map) can be cited as:
+
+```bibtex
+@article{chen2026lingbotmap,
+  title   = {{LingBot-Map}: Geometric Context Transformer for Streaming {3D} Reconstruction},
+  author  = {Chen, Lin-Zhuo and Gao, Jian and Zhang, Shangzhan and Chen, Yihang and Cheng, Ka Leong and Sun, Yipengjing and Hu, Liangxiao and Xue, Nan and Zhu, Xing and Shen, Yujun and Yao, Yao and Xu, Yinghao},
+  journal = {arXiv preprint arXiv:2604.14141},
+  year    = {2026}
 }
 ```
 
