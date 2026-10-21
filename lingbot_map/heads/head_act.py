@@ -14,21 +14,21 @@ def activate_pose(pred_pose_enc, trans_act="linear", quat_act="linear", fl_act="
     Activate pose parameters with specified activation functions.
 
     Args:
-        pred_pose_enc: Tensor containing encoded pose parameters [translation, quaternion, focal length]
+        pred_pose_enc: Tensor containing C2W pose parameters [camera position, rotation quaternion, vertical/horizontal field of view]
         trans_act: Activation type for translation component
         quat_act: Activation type for quaternion component
-        fl_act: Activation type for focal length component
+        fl_act: Activation type for field-of-view components
 
     Returns:
         Activated pose parameters tensor
     """
     T = pred_pose_enc[..., :3]
     quat = pred_pose_enc[..., 3:7]
-    fl = pred_pose_enc[..., 7:]  # or fov
+    fl = pred_pose_enc[..., 7:]  # Vertical and horizontal field of view
 
     T = base_pose_act(T, trans_act)
     quat = base_pose_act(quat, quat_act)
-    fl = base_pose_act(fl, fl_act)  # or fov
+    fl = base_pose_act(fl, fl_act)  # Activate field-of-view components
 
     pred_pose_enc = torch.cat([T, quat, fl], dim=-1)
 
