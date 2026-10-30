@@ -25,6 +25,9 @@ class CameraHead(nn.Module):
     CameraHead predicts camera parameters from token representations using iterative refinement.
 
     It applies a series of transformer blocks (the "trunk") to dedicated camera tokens.
+    Pose encodings represent camera-to-world (C2W) transforms with OpenCV camera axes
+    (x-right, y-down, z-forward): camera position in world coordinates, rotation
+    quaternion, and vertical/horizontal field of view.
     """
 
     def __init__(
@@ -156,9 +159,12 @@ def modulate(x: torch.Tensor, shift: torch.Tensor, scale: torch.Tensor) -> torch
 
 class CameraCausalHead(nn.Module):
     """
-    CameraHead predicts camera parameters from token representations using iterative refinement.
+    CameraCausalHead predicts camera parameters from token representations using iterative refinement.
 
     It applies a series of transformer blocks (the "trunk") to dedicated camera tokens.
+    Pose encodings represent camera-to-world (C2W) transforms with OpenCV camera axes
+    (x-right, y-down, z-forward): camera position in world coordinates, rotation
+    quaternion, and vertical/horizontal field of view.
     """
 
     def __init__(
