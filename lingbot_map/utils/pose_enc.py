@@ -29,8 +29,8 @@ def extri_intri_to_pose_encoding(
     Args:
         extrinsics (torch.Tensor): Camera extrinsic parameters with shape BxSx3x4,
             where B is batch size and S is sequence length.
-            In OpenCV coordinate system (x-right, y-down, z-forward), representing camera from world transformation.
-            The format is [R|t] where R is a 3x3 rotation matrix and t is a 3x1 translation vector.
+            Camera-to-world (C2W) transformation with OpenCV camera axes (x-right, y-down, z-forward).
+            The format is [R|t], where p_world = R @ p_camera + t and t is the camera position in world coordinates.
         intrinsics (torch.Tensor): Camera intrinsic parameters with shape BxSx3x3.
             Defined in pixels, with format:
             [[fx, 0, cx],
@@ -45,9 +45,9 @@ def extri_intri_to_pose_encoding(
     Returns:
         torch.Tensor: Encoded camera pose parameters with shape BxSx9.
             For "absT_quaR_FoV" type, the 9 dimensions are:
-            - [:3] = absolute translation vector T (3D)
-            - [3:7] = rotation as quaternion quat (4D)
-            - [7:] = field of view (2D)
+            - [:3] = camera position in world coordinates T (3D)
+            - [3:7] = camera-to-world rotation as quaternion quat (4D)
+            - [7:] = vertical and horizontal field of view in radians (2D)
     """
 
     # extrinsics: BxSx3x4
@@ -81,9 +81,9 @@ def pose_encoding_to_extri_intri(
         pose_encoding (torch.Tensor): Encoded camera pose parameters with shape BxSx9,
             where B is batch size and S is sequence length.
             For "absT_quaR_FoV" type, the 9 dimensions are:
-            - [:3] = absolute translation vector T (3D)
-            - [3:7] = rotation as quaternion quat (4D)
-            - [7:] = field of view (2D)
+            - [:3] = camera position in world coordinates T (3D)
+            - [3:7] = camera-to-world rotation as quaternion quat (4D)
+            - [7:] = vertical and horizontal field of view in radians (2D)
         image_size_hw (tuple): Tuple of (height, width) of the image in pixels.
             Required for reconstructing intrinsics from field of view values.
             For example: (256, 512).
@@ -95,9 +95,9 @@ def pose_encoding_to_extri_intri(
     Returns:
         tuple: (extrinsics, intrinsics)
             - extrinsics (torch.Tensor): Camera extrinsic parameters with shape BxSx3x4.
-              In OpenCV coordinate system (x-right, y-down, z-forward), representing camera from world
-              transformation. The format is [R|t] where R is a 3x3 rotation matrix and t is
-              a 3x1 translation vector.
+              Camera-to-world (C2W) transformation with OpenCV camera axes (x-right, y-down, z-forward).
+              The format is [R|t], where p_world = R @ p_camera + t and t is the camera
+              position in world coordinates. No pose inversion is performed during decoding.
             - intrinsics (torch.Tensor or None): Camera intrinsic parameters with shape BxSx3x3,
               or None if build_intrinsics is False. Defined in pixels, with format:
               [[fx, 0, cx],
