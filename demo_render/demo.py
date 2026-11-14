@@ -155,10 +155,10 @@ def _squeeze_single_batch(key, value):
 
 
 def postprocess(predictions, images):
-    """Convert pose encoding to extrinsics (c2w) and move to CPU."""
+    """Decode C2W poses, invert to W2C extrinsics for visualization, and move to CPU."""
     extrinsic, intrinsic = pose_encoding_to_extri_intri(predictions["pose_enc"], images.shape[-2:])
 
-    # Convert w2c to c2w
+    # Convert camera-head C2W output to W2C for visualization and saved predictions.
     extrinsic_4x4 = torch.zeros((*extrinsic.shape[:-2], 4, 4), device=extrinsic.device, dtype=extrinsic.dtype)
     extrinsic_4x4[..., :3, :4] = extrinsic
     extrinsic_4x4[..., 3, 3] = 1.0
