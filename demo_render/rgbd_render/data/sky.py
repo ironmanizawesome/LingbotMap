@@ -21,8 +21,9 @@ except ImportError:
 
 
 _SKYSEG_INPUT_SIZE = (320, 320)
-_SKYSEG_SOFT_THRESHOLD = 0.1
-_SKYSEG_CACHE_VERSION = "imagenet_norm_softmap_inverted_v3"
+# Non-sky confidence threshold; > 0.875 keeps raw skyseg scores < 32/255, matching VGGT.
+_SKYSEG_SOFT_THRESHOLD = 0.875
+_SKYSEG_CACHE_VERSION = "imagenet_norm_softmap_inverted_v4"
 _SKYSEG_MODEL_URL = "https://huggingface.co/robbyant/lingbot-map/resolve/main/skyseg_batch.onnx"
 
 
@@ -57,6 +58,9 @@ def _prepare_sky_mask_cache(sky_mask_dir: Optional[str]) -> bool:
 
 
 def _mask_to_float(mask: np.ndarray) -> np.ndarray:
+    if mask.dtype == np.uint8:
+        # run_skyseg outputs and cached PNGs are 8-bit maps in [0, 255].
+        return mask.astype(np.float32) / 255.0
     mask = mask.astype(np.float32)
     if mask.size == 0:
         return mask
@@ -463,7 +467,7 @@ def load_or_create_sky_masks(
                 if mask_filepath is not None and not refresh_cache and os.path.exists(mask_filepath):
                     sky_mask = cv2.imread(mask_filepath, cv2.IMREAD_GRAYSCALE)
                     if sky_mask is not None and sky_mask.shape[:2] == (image_h, image_w):
-                        batch_results[i] = _result_map_to_non_sky_conf(sky_mask) if sky_mask.max() > 1 else _mask_to_float(sky_mask)
+                        batch_results[i] = _mask_to_float(sky_mask)
                         cached = True
 
                 if not cached:
@@ -543,7 +547,7 @@ def load_or_create_sky_masks(
                 if not refresh_cache and os.path.exists(mask_filepath):
                     sky_mask = cv2.imread(mask_filepath, cv2.IMREAD_GRAYSCALE)
                     if sky_mask is not None:
-                        batch_results[idx] = _result_map_to_non_sky_conf(sky_mask) if sky_mask.max() > 1 else _mask_to_float(sky_mask)
+                        batch_results[idx] = _mask_to_float(sky_mask)
                         cached = True
 
                 if not cached:
